@@ -292,15 +292,19 @@ textarea.inp{resize:vertical;min-height:62px;font-size:13.5px;line-height:1.7;}
      このファイルは誰でも中身を読めます。設定値は「鍵」ではありません。
      詳しい手順は別途お渡ししている手順書をご覧ください。
    ==========================================================================*/
-const FIREBASE_CONFIG = {
-  apiKey: "",             // 例: "AIzaSy..."
-  authDomain: "",         // 例: "xxxx.firebaseapp.com"
-  databaseURL: "",        // 例: "https://xxxx-default-rtdb.firebaseio.com"
-  projectId: "",          // 例: "xxxx"
-  appId: ""               // 例: "1:1234:web:abcd"
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyDU5pQ8asjtrTdSHAWF6tunod-PYcfsJ0Y",
+  authDomain: "animememo-fd517.firebaseapp.com",
+  databaseURL: "https://animememo-fd517-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "animememo-fd517",
+  storageBucket: "animememo-fd517.firebasestorage.app",
+  messagingSenderId: "923580011798",
+  appId: "1:923580011798:web:3a645b50f3974e2c146c37",
+  measurementId: "G-BHNS5407ED"
 };
 /* 他人に推測されにくい文字列に変えてください（半角英数字とハイフン推奨） */
-const DB_ROOM = "animemo-room-change-me";
+const DB_ROOM = "animemo-chacha4018";
 /* Firebase で「匿名認証」を有効にした場合は true のまま */
 const USE_ANONYMOUS_AUTH = true;
 /* ==========================================================================*/

@@ -42,8 +42,11 @@ select.sortsel{flex:0 0 auto;background:var(--panel);border:1px solid var(--line
 .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;transition:border-color .16s ease,background .16s ease;}
 .card.open{border-color:var(--accent-dim);background:var(--panel-2);}
 .head{display:flex;align-items:center;gap:9px;padding:9px 11px;cursor:pointer;user-select:none;}
-.rank{flex:0 0 auto;width:26px;text-align:center;font-family:'IBM Plex Mono',monospace;font-size:12.5px;font-weight:600;color:var(--dim);}
-.rank.r1,.rank.r2,.rank.r3{font-size:14px;}
+.rank{flex:0 0 auto;width:26px;text-align:center;font-family:'IBM Plex Mono',monospace;font-size:12.5px;font-weight:600;color:#9aa2b8;}
+.rank.r1{color:var(--gold);font-size:15px;}
+.rank.r2{color:var(--silver);font-size:15px;}
+.rank.r3{color:var(--bronze);font-size:15px;}
+.rank.plain{color:#9aa2b8;font-size:12.5px;}
 .mid{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:1px;}
 .title{font-size:14.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .date{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--dim);}
@@ -57,6 +60,7 @@ select.sortsel{flex:0 0 auto;background:var(--panel);border:1px solid var(--line
 .cell{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:6px 4px;text-align:center;}
 .cell .k{display:block;font-size:9.5px;color:var(--dim);margin-bottom:3px;}
 .cell .v{font-family:'IBM Plex Mono',monospace;font-size:13.5px;font-weight:600;word-break:break-all;}
+.cell .v.hot{color:#ff6b5e;}
 .note{font-size:12.5px;line-height:1.75;color:#cdd3e4;background:var(--bg);border:1px solid var(--line);border-left:3px solid var(--purple);border-radius:8px;padding:8px 10px;margin-bottom:9px;white-space:pre-wrap;word-break:break-word;}
 .rowbtns{display:flex;gap:7px;flex-wrap:wrap;}
 .mini{border:1px solid var(--line);background:var(--bg);color:var(--text);border-radius:8px;padding:9px 13px;font-size:12.5px;cursor:pointer;text-decoration:none;display:inline-block;min-height:38px;line-height:1.4;}
@@ -725,17 +729,27 @@ const USE_ANONYMOUS_AUTH = true;
         : '<div class="empty"><b>まだ記録がありません</b>右下の ＋ から作品を追加すると、ここに一覧が並びます。</div>';
       return;
     }
-    const ranked = all().slice().sort((a, b) => totalOf(b) - totalOf(a));
-    const medal = new Map();
-    ranked.slice(0, 3).forEach((e, i) => medal.set(e.id, i + 1));
+    /* 合計点による順位（同点は同順位、次の順位は飛ばす） */
+    const rankMap = new Map();
+    const ranked = all().filter((e) => parseNum(e.total) !== null).slice().sort((a, b) => totalOf(b) - totalOf(a));
+    let prevTotal = null, prevRank = 0;
+    ranked.forEach((e, i) => {
+      const t = totalOf(e);
+      const r = (prevTotal !== null && t === prevTotal) ? prevRank : i + 1;
+      rankMap.set(e.id, r);
+      prevTotal = t; prevRank = r;
+    });
 
     listEl.innerHTML = arr.map((e) => {
       const open = openIds.has(e.id);
-      const m = medal.get(e.id);
-      const mark = m ? (m === 1 ? '🥇' : m === 2 ? '🥈' : '🥉') : '–';
-      const cells = FIELDS.map((f) =>
-        '<div class="cell"><span class="k">' + esc(f.label) + '</span><span class="v">' + esc(fmtNum(e[f.key])) + '</span></div>'
-      ).join('');
+      const rk = rankMap.get(e.id);
+      const mark = rk ? String(rk) : '–';
+      const rankCls = rk ? (rk <= 3 ? ' r' + rk : ' plain') : '';
+      const cells = FIELDS.map((f) => {
+        const n = parseNum(e[f.key]);
+        const hot = (n !== null && n > 20) ? ' hot' : '';
+        return '<div class="cell"><span class="k">' + esc(f.label) + '</span><span class="v' + hot + '">' + esc(fmtNum(e[f.key])) + '</span></div>';
+      }).join('');
       const link = String(e.link || '').trim();
       const linkHtml = link
         ? '<a class="mini link" href="' + esc(link) + '" target="_blank" rel="noopener noreferrer">作品公式Twitterを開く</a>'
@@ -752,7 +766,7 @@ const USE_ANONYMOUS_AUTH = true;
       return '' +
         '<article class="card' + (open ? ' open' : '') + '" data-id="' + esc(e.id) + '">' +
           '<div class="head" data-act="toggle">' +
-            '<span class="rank' + (m ? ' r' + m : '') + '">' + mark + '</span>' +
+            '<span class="rank' + rankCls + '">' + mark + '</span>' +
             '<span class="mid">' +
               '<span class="title">' + esc(e.title) + '</span>' +
               '<span class="date">' + esc(dateTxt) + '</span>' +

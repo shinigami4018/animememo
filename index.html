@@ -747,7 +747,7 @@ const USE_ANONYMOUS_AUTH = true;
       const rankCls = rk ? (rk <= 3 ? ' r' + rk : ' plain') : '';
       const cells = FIELDS.map((f) => {
         const n = parseNum(e[f.key]);
-        const hot = (n !== null && n > 20) ? ' hot' : '';
+        const hot = (n !== null && n > 19) ? ' hot' : '';
         return '<div class="cell"><span class="k">' + esc(f.label) + '</span><span class="v' + hot + '">' + esc(fmtNum(e[f.key])) + '</span></div>';
       }).join('');
       const link = String(e.link || '').trim();

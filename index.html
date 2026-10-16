@@ -59,9 +59,17 @@ select.sortsel{flex:0 0 auto;background:var(--panel);border:1px solid var(--line
 .cell .v{font-family:'IBM Plex Mono',monospace;font-size:13.5px;font-weight:600;word-break:break-all;}
 .note{font-size:12.5px;line-height:1.75;color:#cdd3e4;background:var(--bg);border:1px solid var(--line);border-left:3px solid var(--purple);border-radius:8px;padding:8px 10px;margin-bottom:9px;white-space:pre-wrap;word-break:break-word;}
 .rowbtns{display:flex;gap:7px;flex-wrap:wrap;}
-.mini{border:1px solid var(--line);background:var(--bg);color:var(--text);border-radius:8px;padding:7px 12px;font-size:12.5px;cursor:pointer;text-decoration:none;display:inline-block;}
+.mini{border:1px solid var(--line);background:var(--bg);color:var(--text);border-radius:8px;padding:9px 13px;font-size:12.5px;cursor:pointer;text-decoration:none;display:inline-block;min-height:38px;line-height:1.4;}
 .mini.link{color:var(--accent);}
 .mini.del{color:var(--warn);margin-left:auto;}
+.mini.primary{background:linear-gradient(145deg,var(--accent),#3fb6a4);color:#04231f;border-color:transparent;font-weight:700;}
+.copybox{margin-top:8px;display:flex;gap:7px;align-items:stretch;}
+.copytxt{
+  flex:1 1 auto;min-width:0;background:var(--bg);border:1px solid var(--accent-dim);
+  border-radius:8px;padding:9px 10px;font-size:12.5px;line-height:1.65;color:var(--text);
+  font-family:'Noto Sans JP','Hiragino Sans','Yu Gothic',sans-serif;
+  resize:none;min-height:60px;-webkit-user-select:all;user-select:all;
+}
 .fab{position:fixed;right:16px;bottom:20px;z-index:35;width:58px;height:58px;border-radius:50%;border:none;cursor:pointer;font-size:27px;line-height:1;font-weight:700;background:linear-gradient(145deg,var(--accent),#3fb6a4);color:#04231f;box-shadow:0 10px 26px rgba(95,216,196,.3);}
 .locked .fab{background:linear-gradient(145deg,#3b4157,#2b3048);color:var(--dim);box-shadow:none;}
 .scrim{position:fixed;inset:0;background:rgba(5,6,11,.72);z-index:40;display:none;}
@@ -150,7 +158,7 @@ textarea.mono{font-family:'IBM Plex Mono',monospace;font-size:11.5px;min-height:
   <label class="f"><span>作成日</span><input id="f_createdAt" class="inp" type="date"></label>
   <button class="sub" id="calcbtn" type="button">5項目から合計を自動計算</button>
   <label class="f"><span>備考</span><textarea id="f_note" class="inp" placeholder="感想・メモなど"></textarea></label>
-  <label class="f"><span>評価リンク（URL）</span><input id="f_link" class="inp" type="url" placeholder="https://" autocomplete="off"></label>
+  <label class="f"><span>作品公式Twitter（URL）</span><input id="f_link" class="inp" type="url" placeholder="https://" autocomplete="off"></label>
   <div class="actrow">
     <button class="btn ghost" id="cancelbtn" type="button">やめる</button>
     <button class="btn primary" id="savebtn" type="button">保存</button>
@@ -165,8 +173,7 @@ textarea.mono{font-family:'IBM Plex Mono',monospace;font-size:11.5px;min-height:
   <button class="menurow" id="m_lock" type="button"><span>パスコードを入力して解錠<small>この端末でのみ解錠されます</small></span><span class="arw">›</span></button>
   <button class="menurow" id="m_pass" type="button"><span>パスコードを変更<small>初期値は 1234</small></span><span class="arw">›</span></button>
   <button class="menurow" id="m_cloud" type="button"><span>共有サーバーの設定・確認<small id="menucloudsmall">現在の状態を表示</small></span><span class="arw">›</span></button>
-  <button class="menurow" id="m_export" type="button"><span>バックアップを書き出す（JSON）<small>読み取り用・機種変更用</small></span><span class="arw">›</span></button>
-  <button class="menurow" id="m_txt" type="button"><span>記録をテキストで書き出す<small>チャットに貼り付けて読ませる用</small></span><span class="arw">›</span></button>
+  <button class="menurow" id="m_export" type="button"><span>バックアップを書き出す（JSON）<small>機種変更・復元用</small></span><span class="arw">›</span></button>
   <button class="menurow" id="m_import" type="button"><span>バックアップを読み込む（JSON）<small>書き出したファイルを選択</small></span><span class="arw">›</span></button>
   <button class="menurow" id="m_csv" type="button"><span>表形式で書き出す（CSV）<small>Excel やスプレッドシート用</small></span><span class="arw">›</span></button>
   <p class="hint" id="cloudhint" style="margin:14px 0 0"></p>
@@ -278,6 +285,7 @@ const USE_ANONYMOUS_AUTH = true;
   let sortAsc = false;
   let query = '';
   const openIds = new Set();
+  const copyOpen = new Set();
 
   let cloudRef = null;
   let cloudMode = false;
@@ -636,6 +644,51 @@ const USE_ANONYMOUS_AUTH = true;
     toast(ok + '件を共有サーバーにアップロードしました');
   }
 
+  /* ---------------- コピー用テキスト ----------------
+     表示形式: タイトル キャラ〇〇 シナリオ〇〇 作画〇〇 テンポ〇〇 追加点〇〇 合計〇〇点
+     （区切りは半角スペース、ラベルと数字の間に空白は入れない、点は合計のみ） */
+  function copyText(e) {
+    if (!e) return '';
+    return String(e.title || '').trim()
+      + ' キャラ' + fmtNum(e.char)
+      + ' シナリオ' + fmtNum(e.scenario)
+      + ' 作画' + fmtNum(e.art)
+      + ' テンポ' + fmtNum(e.tempo)
+      + ' 追加点' + fmtNum(e.other)
+      + ' 合計' + fmtNum(e.total) + '点';
+  }
+  /* クリップボードへコピー（だめなら textarea + execCommand で代替） */
+  async function copyString(s) {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(s);
+        return true;
+      }
+    } catch (err) { /* 代替手段へ */ }
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = s;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.top = '0';
+      ta.style.left = '0';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      try { ta.setSelectionRange(0, s.length); } catch (err) {}
+      const ok = document.execCommand('copy');
+      ta.remove();
+      return !!ok;
+    } catch (err) { return false; }
+  }
+  function selectCopyBox(id) {
+    try {
+      const box = listEl.querySelector('.card[data-id="' + id + '"] .copytxt');
+      if (box) { box.focus(); box.select(); }
+    } catch (err) {}
+  }
+
   /* ---------------- 描画 ---------------- */
   function totalOf(e) {
     const n = parseNum(e.total);
@@ -685,7 +738,14 @@ const USE_ANONYMOUS_AUTH = true;
       ).join('');
       const link = String(e.link || '').trim();
       const linkHtml = link
-        ? '<a class="mini link" href="' + esc(link) + '" target="_blank" rel="noopener noreferrer">評価リンクを開く</a>'
+        ? '<a class="mini link" href="' + esc(link) + '" target="_blank" rel="noopener noreferrer">作品公式Twitterを開く</a>'
+        : '';
+      const isCopy = copyOpen.has(e.id);
+      const copyBox = isCopy
+        ? '<div class="copybox">' +
+            '<textarea class="copytxt" readonly rows="2" spellcheck="false" aria-label="コピー用テキスト">' + esc(copyText(e)) + '</textarea>' +
+            '<button class="mini primary" data-act="copy">コピー</button>' +
+          '</div>'
         : '';
       const noteHtml = String(e.note || '').trim() ? '<div class="note">' + esc(e.note) + '</div>' : '';
       const dateTxt = e.createdAt ? '作成日 ' + fmtDate(e.createdAt) : '作成日 未設定';
@@ -705,8 +765,10 @@ const USE_ANONYMOUS_AUTH = true;
             noteHtml +
             '<div class="rowbtns">' + linkHtml +
               '<button class="mini" data-act="edit">編集</button>' +
+              '<button class="mini" data-act="copyopen">' + (isCopy ? 'テキストを閉じる' : 'コピー用テキスト') + '</button>' +
               '<button class="mini del" data-act="del">削除</button>' +
             '</div>' +
+            copyBox +
           '</div>' +
         '</article>';
     }).join('');
@@ -895,24 +957,12 @@ const USE_ANONYMOUS_AUTH = true;
     download('animemo-' + stamp() + '.json', JSON.stringify(all(), null, 2), 'application/json');
     toast('書き出しました');
   }
-  function exportTxt() {
-    const lines = ['アニメ採点メモ 記録一覧（' + items.size + '件）', ''];
-    visibleEntries().forEach((e, i) => {
-      lines.push((i + 1) + '. ' + e.title + '　合計 ' + fmtNum(e.total) + '点' + (e.createdAt ? '（作成日 ' + fmtDate(e.createdAt) + '）' : ''));
-      lines.push('   キャラ ' + fmtNum(e.char) + ' / シナリオ ' + fmtNum(e.scenario) + ' / 作画 ' + fmtNum(e.art) + ' / テンポ ' + fmtNum(e.tempo) + ' / 追加点 ' + fmtNum(e.other));
-      if (String(e.note || '').trim()) lines.push('   備考: ' + String(e.note).replace(/\n/g, ' / '));
-      if (String(e.link || '').trim()) lines.push('   リンク: ' + e.link);
-      lines.push('');
-    });
-    download('animemo-' + stamp() + '.txt', lines.join('\r\n'), 'text/plain;charset=utf-8');
-    toast('テキストを書き出しました');
-  }
   function csvCell(v) {
     const s = v == null ? '' : String(v);
     return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
   }
   function exportCsv() {
-    const head = ['作品名', '作成日', 'キャラ', 'シナリオ', '作画', 'テンポ', '追加点', '合計', '備考', 'リンク'];
+    const head = ['作品名', '作成日', 'キャラ', 'シナリオ', '作画', 'テンポ', '追加点', '合計', '備考', '作品公式Twitter'];
     const rows = visibleEntries().map((e) => [
       e.title, e.createdAt ? fmtDate(e.createdAt) : '',
       e.char, e.scenario, e.art, e.tempo, e.other, e.total, e.note, e.link
@@ -999,7 +1049,7 @@ const USE_ANONYMOUS_AUTH = true;
   $('#c_save').addEventListener('click', saveCloudFromSheet);
   $('#c_reset').addEventListener('click', clearSavedCloud);
 
-  listEl.addEventListener('click', (ev) => {
+  listEl.addEventListener('click', async (ev) => {
     const btn = ev.target.closest('[data-act]');
     if (!btn) return;
     const card = ev.target.closest('.card');
@@ -1011,6 +1061,21 @@ const USE_ANONYMOUS_AUTH = true;
       render();
     } else if (act === 'edit') {
       if (requireUnlock()) openForm(id);
+    } else if (act === 'copyopen') {
+      const e = items.get(id);
+      if (!e) return;
+      if (copyOpen.has(id)) { copyOpen.delete(id); render(); return; }
+      copyOpen.add(id);
+      render();
+      const ok = await copyString(copyText(e));
+      selectCopyBox(id);
+      toast(ok ? 'コピーしました' : '長押しして「コピー」を選んでください');
+    } else if (act === 'copy') {
+      const e = items.get(id);
+      if (!e) return;
+      const ok = await copyString(copyText(e));
+      selectCopyBox(id);
+      toast(ok ? 'コピーしました' : '長押しして「コピー」を選んでください');
     } else if (act === 'del') {
       if (!requireUnlock()) return;
       const e = items.get(id);
@@ -1055,7 +1120,6 @@ const USE_ANONYMOUS_AUTH = true;
     cfg.pass = nv.trim(); saveCfg(); toast('パスコードを変更しました');
   });
   $('#m_export').addEventListener('click', () => { if (requireUnlock()) exportJson(); });
-  $('#m_txt').addEventListener('click', exportTxt);
   $('#m_csv').addEventListener('click', exportCsv);
   const fileInput = $('#fileinput');
   $('#m_import').addEventListener('click', () => { if (requireUnlock()) fileInput.click(); });

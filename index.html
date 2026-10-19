@@ -61,6 +61,10 @@ select.sortsel{flex:0 0 auto;background:var(--panel);border:1px solid var(--line
 .cell .k{display:block;font-size:9.5px;color:var(--dim);margin-bottom:3px;}
 .cell .v{font-family:'IBM Plex Mono',monospace;font-size:13.5px;font-weight:600;word-break:break-all;}
 .cell .v.hot{color:#ff6b5e;}
+.total.t-red{color:#ff5b52;}
+.total.t-gold{color:var(--gold);}
+.total.t-silver{color:var(--silver);}
+.total.t-bronze{color:var(--bronze);}
 .note{font-size:12.5px;line-height:1.75;color:#cdd3e4;background:var(--bg);border:1px solid var(--line);border-left:3px solid var(--purple);border-radius:8px;padding:8px 10px;margin-bottom:9px;white-space:pre-wrap;word-break:break-word;}
 .rowbtns{display:flex;gap:7px;flex-wrap:wrap;}
 .mini{border:1px solid var(--line);background:var(--bg);color:var(--text);border-radius:8px;padding:9px 13px;font-size:12.5px;cursor:pointer;text-decoration:none;display:inline-block;min-height:38px;line-height:1.4;}
@@ -81,6 +85,7 @@ select.sortsel{flex:0 0 auto;background:var(--panel);border:1px solid var(--line
 .sheet{position:fixed;left:0;right:0;bottom:0;z-index:50;max-height:92vh;overflow-y:auto;background:var(--panel);border-top:1px solid var(--line);border-radius:18px 18px 0 0;padding:16px 15px 26px;transform:translateY(102%);transition:transform .24s cubic-bezier(.22,.7,.2,1);box-shadow:0 -12px 34px rgba(0,0,0,.5);}
 .sheet.show{transform:translateY(0);}
 #dialogsheet{z-index:70;}
+#passsheet{z-index:70;}
 .sheet h2{font-family:'Zen Maru Gothic',sans-serif;font-size:16px;font-weight:700;margin:0 0 3px;}
 .sheet .hint{font-size:11.5px;color:var(--dim);margin:0 0 14px;line-height:1.7;white-space:pre-wrap;}
 .sheet .grab{width:38px;height:4px;border-radius:3px;background:var(--line);margin:0 auto 12px;}
@@ -91,6 +96,16 @@ label.f span{display:block;font-size:11.5px;color:var(--dim);margin-bottom:5px;}
 textarea.inp{resize:vertical;min-height:62px;font-size:13.5px;line-height:1.7;}
 textarea.mono{font-family:'IBM Plex Mono',monospace;font-size:11.5px;min-height:150px;line-height:1.6;}
 .three{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
+.totalwrap{display:flex;gap:6px;align-items:stretch;}
+.totalwrap .inp{flex:1 1 auto;min-width:0;}
+.calcbtn{
+  flex:1 1 auto;white-space:nowrap;border:1px dashed var(--accent-dim);
+  background:rgba(95,216,196,.09);color:var(--accent);border-radius:9px;
+  padding:10px 12px;font-size:13px;font-weight:700;cursor:pointer;
+}
+.calcbtn:active{border-style:solid;}
+.hide{display:none !important;}
 .actrow{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;}
 .btn{flex:1 1 40%;border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:13px 10px;font-size:14px;font-weight:700;cursor:pointer;}
 .btn.primary{background:linear-gradient(145deg,var(--accent),#3fb6a4);color:#04231f;border-color:transparent;}
@@ -116,7 +131,6 @@ textarea.mono{font-family:'IBM Plex Mono',monospace;font-size:11.5px;min-height:
     <h1>アニメ採点メモ</h1>
     <span class="count" id="count">0件</span>
     <span class="badge off" id="syncBadge">この端末のみ</span>
-    <span class="badge off" id="lockBadge">ロック中</span>
   </div>
   <div class="tools">
     <input id="search" class="search" type="search" placeholder="作品名で検索" autocomplete="off">
@@ -146,7 +160,7 @@ textarea.mono{font-family:'IBM Plex Mono',monospace;font-size:11.5px;min-height:
 <section class="sheet" id="formsheet" aria-hidden="true">
   <div class="grab"></div>
   <h2 id="formtitle">作品を追加</h2>
-  <p class="hint" id="formhint">点数欄は数字でも言葉でも構いません。自動計算で合計を出せます。</p>
+  <p class="hint" id="formhint">4項目には当てはまらない評価点、言葉にできない点数を追加点として入力することができます。</p>
   <label class="f"><span>作品名 <em style="color:var(--warn);font-style:normal">*</em></span>
     <input id="f_title" class="inp" type="text" placeholder="例：〇〇の物語" autocomplete="off"></label>
   <div class="three">
@@ -157,10 +171,16 @@ textarea.mono{font-family:'IBM Plex Mono',monospace;font-size:11.5px;min-height:
   <div class="three">
     <label class="f"><span>テンポ</span><input id="f_tempo" class="inp" type="text" inputmode="decimal"></label>
     <label class="f"><span>追加点</span><input id="f_other" class="inp" type="text" inputmode="decimal"></label>
-    <label class="f"><span>合計 <em style="color:var(--warn);font-style:normal">*</em></span><input id="f_total" class="inp" type="text" inputmode="decimal"></label>
+    <label class="f"><span>合計 <em style="color:var(--warn);font-style:normal">*</em></span>
+      <span class="totalwrap">
+        <input id="f_total" class="inp" type="text" inputmode="decimal">
+        <button id="calcbtn" class="calcbtn" type="button">自動計算</button>
+      </span></label>
   </div>
-  <label class="f"><span>作成日</span><input id="f_createdAt" class="inp" type="date"></label>
-  <button class="sub" id="calcbtn" type="button">5項目から合計を自動計算</button>
+  <div class="two">
+    <label class="f"><span>作成日</span><input id="f_createdAt" class="inp" type="date"></label>
+    <label class="f"><span>視聴回数（周）</span><input id="f_watch" class="inp" type="number" min="1" step="1" inputmode="numeric"></label>
+  </div>
   <label class="f"><span>備考</span><textarea id="f_note" class="inp" placeholder="感想・メモなど"></textarea></label>
   <label class="f"><span>作品公式Twitter（URL）</span><input id="f_link" class="inp" type="url" placeholder="https://" autocomplete="off"></label>
   <div class="actrow">
@@ -173,9 +193,7 @@ textarea.mono{font-family:'IBM Plex Mono',monospace;font-size:11.5px;min-height:
 <section class="sheet" id="menusheet" aria-hidden="true">
   <div class="grab"></div>
   <h2>メニュー</h2>
-  <p class="hint" id="menuhint">追加・編集・削除にはパスコードが必要です。</p>
-  <button class="menurow" id="m_lock" type="button"><span>パスコードを入力して解錠<small>この端末でのみ解錠されます</small></span><span class="arw">›</span></button>
-  <button class="menurow" id="m_pass" type="button"><span>パスコードを変更<small>初期値は 1234</small></span><span class="arw">›</span></button>
+  <p class="hint" id="menuhint">追加・編集・削除のときはパスワードの入力が必要です。</p>
   <button class="menurow" id="m_cloud" type="button"><span>共有サーバーの設定・確認<small id="menucloudsmall">現在の状態を表示</small></span><span class="arw">›</span></button>
   <button class="menurow" id="m_export" type="button"><span>バックアップを書き出す（JSON）<small>機種変更・復元用</small></span><span class="arw">›</span></button>
   <button class="menurow" id="m_import" type="button"><span>バックアップを読み込む（JSON）<small>書き出したファイルを選択</small></span><span class="arw">›</span></button>
@@ -206,6 +224,19 @@ textarea.mono{font-family:'IBM Plex Mono',monospace;font-size:11.5px;min-height:
   </div>
   <div class="actrow">
     <button class="btn ghost" id="c_reset" type="button">この端末の設定を消す（ファイルの設定に戻す）</button>
+  </div>
+</section>
+
+<!-- パスワード -->
+<section class="sheet" id="passsheet" aria-hidden="true">
+  <div class="grab"></div>
+  <h2>パスワード</h2>
+  <p class="hint" id="passhint">パスワードを入力してください</p>
+  <label class="f"><span>パスワード</span>
+    <input id="passinput" class="inp" type="password" inputmode="numeric" autocomplete="off" placeholder="4桁の数字"></label>
+  <div class="actrow">
+    <button class="btn ghost" id="passcancel" type="button">やめる</button>
+    <button class="btn primary" id="passok" type="button">決定</button>
   </div>
 </section>
 
@@ -254,7 +285,9 @@ const USE_ANONYMOUS_AUTH = true;
   const LS_OLD = 'animemo.entries.v1';
   const LS_CFG = 'animemo.config.v1';
   const LS_CLOUD = 'animemo.cloud.v1';
-  const DEFAULT_PASS = '1234';
+  /* パスワードは 4253 で固定（変更できません） */
+  const PASS = '4253';
+  const ITEM_RED = 20;
 
   const FIELDS = [
     { key: 'char', label: 'キャラ' },
@@ -267,7 +300,6 @@ const USE_ANONYMOUS_AUTH = true;
   const $ = (s) => document.querySelector(s);
   const listEl = $('#list');
   const countEl = $('#count');
-  const lockBadge = $('#lockBadge');
   const syncBadge = $('#syncBadge');
   const errbar = $('#errbar');
   const footEl = $('#foot');
@@ -278,12 +310,11 @@ const USE_ANONYMOUS_AUTH = true;
   const formSheet = $('#formsheet');
   const menuSheet = $('#menusheet');
   const cloudSheet = $('#cloudsheet');
+  const passSheet = $('#passsheet');
   const dialogSheet = $('#dialogsheet');
   const toastEl = $('#toast');
 
   const items = new Map();
-  let cfg = { pass: DEFAULT_PASS };
-  let unlocked = false;
   let editingId = null;
   let sortKey = 'total';
   let sortAsc = false;
@@ -330,6 +361,41 @@ const USE_ANONYMOUS_AUTH = true;
     if (!m) return String(iso);
     return m[1] + '/' + m[2].padStart(2, '0') + '/' + m[3].padStart(2, '0');
   }
+  /* 日付の差（日数） */
+  function daysBetween(fromISO, toISO) {
+    const a = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(String(fromISO || ''));
+    const b = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(String(toISO || ''));
+    if (!a || !b) return null;
+    return Math.round((Date.UTC(+b[1], +b[2] - 1, +b[3]) - Date.UTC(+a[1], +a[2] - 1, +a[3])) / 86400000);
+  }
+  /* 前回視聴〇〇日前 */
+  function gapText(e) {
+    if (!e || !e.prevDate || !e.createdAt) return '';
+    const n = daysBetween(e.prevDate, e.createdAt);
+    if (n === null) return '';
+    return '前回視聴' + Math.max(0, n) + '日前';
+  }
+  /* 〇〇周視聴 */
+  function watchText(e) {
+    const n = parseNum(e && e.watchCount);
+    return (n === null || n < 1 ? 1 : Math.floor(n)) + '周視聴';
+  }
+  /* 追加順の並べ替えに使う日付 */
+  function dateVal(e) {
+    const m = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(String((e && e.createdAt) || ''));
+    if (!m) return null;
+    return Date.UTC(+m[1], +m[2] - 1, +m[3]);
+  }
+  /* 合計点の色分け */
+  function totalClass(v) {
+    const n = parseNum(v);
+    if (n === null) return '';
+    if (n >= 100) return ' t-red';
+    if (n >= 90) return ' t-gold';
+    if (n >= 80) return ' t-silver';
+    if (n >= 70) return ' t-bronze';
+    return '';
+  }
   let toastTimer = null;
   function toast(msg) {
     toastEl.textContent = msg;
@@ -356,6 +422,9 @@ const USE_ANONYMOUS_AUTH = true;
     o.note = x.note == null ? '' : String(x.note);
     o.link = x.link == null ? '' : String(x.link);
     o.createdAt = typeof x.createdAt === 'string' ? x.createdAt : '';
+    o.prevDate = typeof x.prevDate === 'string' ? x.prevDate : '';
+    const w = parseNum(x.watchCount);
+    o.watchCount = (w === null || w < 1) ? 1 : Math.floor(w);
     o.order = Number(x.order) || 0;
     return o;
   }
@@ -429,16 +498,6 @@ const USE_ANONYMOUS_AUTH = true;
       if (!n.order) { max += 1; n.order = max; }
       items.set(n.id, n);
     });
-  }
-  function loadCfg() {
-    try {
-      const raw = localStorage.getItem(LS_CFG);
-      if (raw) cfg = Object.assign(cfg, JSON.parse(raw));
-    } catch (e) {}
-    if (!cfg.pass) cfg.pass = DEFAULT_PASS;
-  }
-  function saveCfg() {
-    try { localStorage.setItem(LS_CFG, JSON.stringify(cfg)); } catch (e) {}
   }
   function nextOrder() {
     let max = 0;
@@ -707,7 +766,13 @@ const USE_ANONYMOUS_AUTH = true;
     arr.sort((a, b) => {
       let av, bv;
       if (sortKey === 'title') return String(a.title || '').localeCompare(String(b.title || ''), 'ja') * dir;
-      if (sortKey === 'order') return ((Number(a.order) || 0) - (Number(b.order) || 0)) * dir;
+      if (sortKey === 'order') {
+        const da = dateVal(a), db2 = dateVal(b);
+        if (da !== null && db2 !== null && da !== db2) return (da - db2) * dir;
+        if (da !== null && db2 === null) return -1 * dir;
+        if (da === null && db2 !== null) return 1 * dir;
+        return ((Number(a.order) || 0) - (Number(b.order) || 0)) * dir;
+      }
       if (sortKey === 'total') { av = totalOf(a); bv = totalOf(b); }
       else {
         const na = parseNum(a[sortKey]), nb = parseNum(b[sortKey]);
@@ -747,7 +812,7 @@ const USE_ANONYMOUS_AUTH = true;
       const rankCls = rk ? (rk <= 3 ? ' r' + rk : ' plain') : '';
       const cells = FIELDS.map((f) => {
         const n = parseNum(e[f.key]);
-        const hot = (n !== null && n > 19) ? ' hot' : '';
+        const hot = (n !== null && n >= ITEM_RED) ? ' hot' : '';
         return '<div class="cell"><span class="k">' + esc(f.label) + '</span><span class="v' + hot + '">' + esc(fmtNum(e[f.key])) + '</span></div>';
       }).join('');
       const link = String(e.link || '').trim();
@@ -762,7 +827,11 @@ const USE_ANONYMOUS_AUTH = true;
           '</div>'
         : '';
       const noteHtml = String(e.note || '').trim() ? '<div class="note">' + esc(e.note) + '</div>' : '';
-      const dateTxt = e.createdAt ? '作成日 ' + fmtDate(e.createdAt) : '作成日 未設定';
+      const dateParts = [e.createdAt ? '作成日 ' + fmtDate(e.createdAt) : '作成日 未設定'];
+      const gap = gapText(e);
+      if (gap) dateParts.push(gap);
+      dateParts.push(watchText(e));
+      const dateTxt = dateParts.join(' ');
       return '' +
         '<article class="card' + (open ? ' open' : '') + '" data-id="' + esc(e.id) + '">' +
           '<div class="head" data-act="toggle">' +
@@ -771,7 +840,7 @@ const USE_ANONYMOUS_AUTH = true;
               '<span class="title">' + esc(e.title) + '</span>' +
               '<span class="date">' + esc(dateTxt) + '</span>' +
             '</span>' +
-            '<span class="total">' + esc(fmtNum(e.total)) + '<small>点</small></span>' +
+            '<span class="total' + totalClass(e.total) + '">' + esc(fmtNum(e.total)) + '<small>点</small></span>' +
             '<span class="chev">▼</span>' +
           '</div>' +
           '<div class="body">' +
@@ -789,7 +858,7 @@ const USE_ANONYMOUS_AUTH = true;
   }
 
   /* ---------------- シート ---------------- */
-  const SHEETS = () => [formSheet, menuSheet, cloudSheet, dialogSheet];
+  const SHEETS = () => [formSheet, menuSheet, cloudSheet, passSheet, dialogSheet];
   function anyOpen() { return SHEETS().some((s) => s.classList.contains('show')); }
   function openSheet(el) {
     el.classList.add('show');
@@ -802,6 +871,7 @@ const USE_ANONYMOUS_AUTH = true;
     if (!anyOpen()) scrim.classList.remove('show');
   }
   function closeAllSheets() {
+    if (passResolve) { const r = passResolve; passResolve = null; r(false); }
     SHEETS().forEach((s) => {
       s.classList.remove('show');
       s.setAttribute('aria-hidden', 'true');
@@ -840,21 +910,29 @@ const USE_ANONYMOUS_AUTH = true;
     r('cancel');
     return true;
   }
-  function setLockUI() {
-    if (unlocked) {
-      lockBadge.textContent = '解錠中';
-      lockBadge.className = 'badge';
-      document.body.classList.remove('locked');
-    } else {
-      lockBadge.textContent = 'ロック中';
-      lockBadge.className = 'badge off';
-      document.body.classList.add('locked');
-    }
+  /* ---------------- パスワード（4253 固定） ---------------- */
+  let passResolve = null;
+  function askPass(reason) {
+    return new Promise((resolve) => {
+      if (passResolve) { const p = passResolve; passResolve = null; p(false); }
+      passResolve = resolve;
+      $('#passhint').textContent = reason || 'パスワードを入力してください';
+      $('#passinput').value = '';
+      openSheet(passSheet);
+      setTimeout(() => { try { $('#passinput').focus(); } catch (e) {} }, 240);
+    });
   }
-  function requireUnlock() {
-    if (unlocked) return true;
-    toast('先にメニューから解錠してください');
-    return false;
+  function finishPass(result) {
+    const r = passResolve; passResolve = null;
+    closeSheet(passSheet);
+    if (r) r(result);
+  }
+  function submitPass() {
+    const v = $('#passinput').value.trim();
+    if (v === PASS) { finishPass(true); return; }
+    toast('パスワードが違います');
+    $('#passinput').value = '';
+    try { $('#passinput').focus(); } catch (e) {}
   }
 
   /* ---------------- フォーム ---------------- */
@@ -864,15 +942,26 @@ const USE_ANONYMOUS_AUTH = true;
     $('#formtitle').textContent = e ? '記録を編集' : '作品を追加';
     $('#formhint').textContent = e
       ? '内容を書き換えて保存してください。'
-      : '点数欄は数字でも言葉でも構いません。自動計算で合計を出せます。';
+      : '4項目には当てはまらない評価点、言葉にできない点数を追加点として入力することができます。';
     $('#f_title').value = e ? e.title : '';
     FIELDS.forEach((f) => { $('#f_' + f.key).value = e ? e[f.key] : ''; });
     $('#f_total').value = e && e.total !== null ? e.total : '';
     $('#f_createdAt').value = e && e.createdAt ? e.createdAt : todayISO();
+    $('#f_watch').value = e ? (parseNum(e.watchCount) || 1) : 1;
     $('#f_note').value = e ? e.note : '';
     $('#f_link').value = e ? e.link : '';
+    syncCalcBtn();
     openSheet(formSheet);
     setTimeout(() => { try { $('#f_title').focus(); } catch (err) {} }, 240);
+  }
+  /* 合計欄の自動計算ボタン: 合計が入っているときは隠し、空のときだけ出す */
+  function syncCalcBtn() {
+    const has = $('#f_total').value.trim() !== '';
+    $('#calcbtn').classList.toggle('hide', has);
+  }
+  function clearTotal() {
+    $('#f_total').value = '';
+    syncCalcBtn();
   }
   function calcTotal() {
     let sum = 0, any = false;
@@ -883,27 +972,31 @@ const USE_ANONYMOUS_AUTH = true;
     if (!any) { toast('点数が入っていません'); return; }
     const rounded = Math.round(sum * 100) / 100;
     $('#f_total').value = String(rounded);
-    toast('合計 ' + rounded + ' を入れました（必要なら調整可）');
+    syncCalcBtn();
+    toast('合計 ' + rounded + ' を入れました');
   }
   function collect() {
     const o = {
       title: $('#f_title').value.trim(),
       total: parseNum($('#f_total').value.trim()),
       createdAt: $('#f_createdAt').value || '',
+      watchCount: parseNum($('#f_watch').value) || 1,
       note: $('#f_note').value.trim(),
       link: $('#f_link').value.trim()
     };
     FIELDS.forEach((f) => { o[f.key] = $('#f_' + f.key).value.trim(); });
     return o;
   }
-  function applyTo(target, src, keepMeta) {
+  function applyTo(target, src) {
     target.title = src.title;
     FIELDS.forEach((f) => { target[f.key] = src[f.key]; });
     target.total = src.total;
     target.note = src.note;
     target.link = src.link;
-    if (keepMeta) target.createdAt = target.createdAt || src.createdAt;
-    else target.createdAt = src.createdAt;
+    /* 作成日は入力された値をそのまま使う（空にしたら未設定のまま） */
+    target.createdAt = src.createdAt;
+    const w = parseNum(src.watchCount);
+    target.watchCount = (w === null || w < 1) ? 1 : Math.floor(w);
     return target;
   }
   async function save() {
@@ -914,7 +1007,7 @@ const USE_ANONYMOUS_AUTH = true;
     if (editingId) {
       const e = items.get(editingId);
       if (!e) { closeAllSheets(); return; }
-      putEntry(applyTo(e, src, false));
+      putEntry(applyTo(e, src));
       closeAllSheets();
       toast('更新しました');
       return;
@@ -925,7 +1018,7 @@ const USE_ANONYMOUS_AUTH = true;
       const target = dup.slice().sort((a, b) => (Number(b.order) || 0) - (Number(a.order) || 0))[0];
       const pick = await askChoice({
         title: '同じ作品名があります',
-        msg: '「' + src.title + '」は既に登録されています（' + dup.length + '件）。\nどうしますか？\n\n・上書き — 登録済みの記録を今回の内容に置き換えます（作成日と並び順は元のまま）\n・新規作成 — 別の記録としてもう1件追加します',
+        msg: '「' + src.title + '」は既に登録されています（' + dup.length + '件）。\nどうしますか？\n\n・上書き — 登録済みの記録を今回の内容に置き換えます（作成日を今回の日付に更新し、視聴回数が1つ増えます）\n・新規作成 — 別の記録としてもう1件追加します',
         buttons: [
           { label: '上書きする', value: 'overwrite', kind: 'primary' },
           { label: '新規作成', value: 'new' },
@@ -934,10 +1027,15 @@ const USE_ANONYMOUS_AUTH = true;
       });
       if (pick !== 'overwrite' && pick !== 'new') return;
       if (pick === 'overwrite') {
-        applyTo(target, src, true);
+        const prevDate = target.createdAt || '';
+        const prevWatch = parseNum(target.watchCount) || 1;
+        applyTo(target, src);
+        if (prevDate) target.prevDate = prevDate;
+        target.watchCount = prevWatch + 1;
+        target.order = nextOrder();
         putEntry(target);
         closeAllSheets();
-        toast('「' + target.title + '」を上書きしました');
+        toast('「' + target.title + '」を上書きしました（' + target.watchCount + '周視聴）');
         return;
       }
     }
@@ -947,6 +1045,8 @@ const USE_ANONYMOUS_AUTH = true;
       char: src.char, scenario: src.scenario, art: src.art, tempo: src.tempo, other: src.other,
       total: src.total, note: src.note, link: src.link,
       createdAt: src.createdAt || todayISO(),
+      prevDate: '',
+      watchCount: src.watchCount,
       order: nextOrder()
     }));
     closeAllSheets();
@@ -976,9 +1076,9 @@ const USE_ANONYMOUS_AUTH = true;
     return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
   }
   function exportCsv() {
-    const head = ['作品名', '作成日', 'キャラ', 'シナリオ', '作画', 'テンポ', '追加点', '合計', '備考', '作品公式Twitter'];
+    const head = ['作品名', '作成日', '視聴回数', 'キャラ', 'シナリオ', '作画', 'テンポ', '追加点', '合計', '備考', '作品公式Twitter'];
     const rows = visibleEntries().map((e) => [
-      e.title, e.createdAt ? fmtDate(e.createdAt) : '',
+      e.title, e.createdAt ? fmtDate(e.createdAt) : '', watchText(e),
       e.char, e.scenario, e.art, e.tempo, e.other, e.total, e.note, e.link
     ]);
     download('animemo-' + stamp() + '.csv', '\uFEFF' + [head].concat(rows).map((r) => r.map(csvCell).join(',')).join('\r\n'), 'text/csv;charset=utf-8');
@@ -1028,36 +1128,26 @@ const USE_ANONYMOUS_AUTH = true;
     fr.readAsText(file);
   }
 
-  /* ---------------- 作成日の一括設定（初回のみ） ---------------- */
-  async function offerDateFill() {
-    if (cfg.dateFilled) return;
-    const missing = all().filter((e) => !e.createdAt);
-    if (!missing.length) { cfg.dateFilled = true; saveCfg(); return; }
-    const pick = await askChoice({
-      title: '作成日が未設定の記録があります',
-      msg: missing.length + '件の記録に作成日が入っていません。\n今日の日付（' + fmtDate(todayISO()) + '）を入れておきますか？\nあとから1件ずつ編集することもできます。',
-      buttons: [
-        { label: '今日の日付を入れる', value: 'fill', kind: 'primary' },
-        { label: 'あとで', value: 'skip', kind: 'ghost' }
-      ]
-    });
-    if (pick === 'fill') {
-      const today = todayISO();
-      missing.forEach((e) => { e.createdAt = today; putEntry(e); });
-      toast(missing.length + '件に作成日を入れました');
-    }
-    cfg.dateFilled = true;
-    saveCfg();
-  }
-
   /* ---------------- イベント ---------------- */
-  $('#addbtn').addEventListener('click', () => { if (requireUnlock()) openForm(null); });
+  $('#addbtn').addEventListener('click', async () => {
+    if (!(await askPass('記録を追加します。パスワードを入力してください'))) return;
+    openForm(null);
+  });
+  $('#passok').addEventListener('click', submitPass);
+  $('#passcancel').addEventListener('click', () => finishPass(false));
+  $('#passinput').addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter') { ev.preventDefault(); submitPass(); }
+  });
   $('#menubtn').addEventListener('click', () => openSheet(menuSheet));
   scrim.addEventListener('click', () => { if (!cancelDialog()) closeAllSheets(); });
   $('#cancelbtn').addEventListener('click', closeAllSheets);
   $('#menuclose').addEventListener('click', closeAllSheets);
   $('#savebtn').addEventListener('click', save);
   $('#calcbtn').addEventListener('click', calcTotal);
+  FIELDS.forEach((f) => {
+    $('#f_' + f.key).addEventListener('input', clearTotal);
+  });
+  $('#f_total').addEventListener('input', syncCalcBtn);
   $('#m_cloud').addEventListener('click', openCloudSheet);
   $('#c_cancel').addEventListener('click', closeAllSheets);
   $('#c_save').addEventListener('click', saveCloudFromSheet);
@@ -1074,7 +1164,8 @@ const USE_ANONYMOUS_AUTH = true;
       if (openIds.has(id)) openIds.delete(id); else openIds.add(id);
       render();
     } else if (act === 'edit') {
-      if (requireUnlock()) openForm(id);
+      if (!(await askPass('記録を編集します。パスワードを入力してください'))) return;
+      openForm(id);
     } else if (act === 'copyopen') {
       const e = items.get(id);
       if (!e) return;
@@ -1091,7 +1182,7 @@ const USE_ANONYMOUS_AUTH = true;
       selectCopyBox(id);
       toast(ok ? 'コピーしました' : '長押しして「コピー」を選んでください');
     } else if (act === 'del') {
-      if (!requireUnlock()) return;
+      if (!(await askPass('記録を削除します。パスワードを入力してください'))) return;
       const e = items.get(id);
       if (!e) return;
       askChoice({
@@ -1117,26 +1208,16 @@ const USE_ANONYMOUS_AUTH = true;
     render();
   });
 
-  $('#m_lock').addEventListener('click', () => {
-    if (unlocked) { unlocked = false; setLockUI(); closeAllSheets(); toast('ロックしました'); return; }
-    const v = window.prompt('パスコードを入力してください');
-    if (v === null) return;
-    if (v === cfg.pass) { unlocked = true; setLockUI(); closeAllSheets(); toast('解錠しました'); }
-    else toast('パスコードが違います');
+  $('#m_export').addEventListener('click', async () => {
+    if (!(await askPass('バックアップを書き出します。パスワードを入力してください'))) return;
+    exportJson();
   });
-  $('#m_pass').addEventListener('click', () => {
-    const cur = window.prompt('現在のパスコードを入力してください');
-    if (cur === null) return;
-    if (cur !== cfg.pass) { toast('現在のパスコードが違います'); return; }
-    const nv = window.prompt('新しいパスコードを入力してください（1文字以上）');
-    if (nv === null) return;
-    if (!nv.trim()) { toast('空にはできません'); return; }
-    cfg.pass = nv.trim(); saveCfg(); toast('パスコードを変更しました');
-  });
-  $('#m_export').addEventListener('click', () => { if (requireUnlock()) exportJson(); });
   $('#m_csv').addEventListener('click', exportCsv);
   const fileInput = $('#fileinput');
-  $('#m_import').addEventListener('click', () => { if (requireUnlock()) fileInput.click(); });
+  $('#m_import').addEventListener('click', async () => {
+    if (!(await askPass('バックアップを読み込みます。パスワードを入力してください'))) return;
+    fileInput.click();
+  });
   fileInput.addEventListener('change', () => {
     if (fileInput.files && fileInput.files[0]) importJson(fileInput.files[0]);
     fileInput.value = '';
@@ -1148,17 +1229,13 @@ const USE_ANONYMOUS_AUTH = true;
   });
 
   /* ---------------- 起動 ---------------- */
-  loadCfg();
   loadLocal();
-  setLockUI();
   render();
   setSync('local');
-  initCloud().then(() => {
-    if (syncState !== 'connecting') offerDateFill();
-  });
+  initCloud();
 })();
 
 </script>
-<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4bc70e2c01a94c73b74392e4234840661791215815920" integrity="sha512-L0ha0OXavK/8okipN9F8BtP84dg9DUhPERbBXzwI6dgTA55d2+yweo3pn5CSFYs45/r8md2+xvUPtTdvTNRfjA==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","spa":2}' crossorigin="anonymous"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","spa":2}' crossorigin="anonymous"></script>
 </body>
 </html>

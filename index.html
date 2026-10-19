@@ -956,7 +956,9 @@ const USE_ANONYMOUS_AUTH = true;
     $('#f_title').value = e ? e.title : '';
     FIELDS.forEach((f) => { $('#f_' + f.key).value = e ? e[f.key] : ''; });
     $('#f_total').value = e && e.total !== null ? e.total : '';
-    $('#f_createdAt').value = e && e.createdAt ? e.createdAt : todayISO();
+    /* 新規作成のときだけ今日を初期値にする。
+       既存の記録は未設定なら空のまま（勝手に今日を入れない） */
+    $('#f_createdAt').value = e ? (e.createdAt || '') : todayISO();
     $('#f_watch').value = e ? (parseNum(e.watchCount) || 1) : 1;
     $('#f_note').value = e ? e.note : '';
     $('#f_link').value = e ? e.link : '';

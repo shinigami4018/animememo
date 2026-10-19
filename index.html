@@ -722,7 +722,13 @@ const USE_ANONYMOUS_AUTH = true;
       + ' 作画' + fmtNum(e.art)
       + ' テンポ' + fmtNum(e.tempo)
       + ' 追加点' + fmtNum(e.other)
-      + ' 合計' + fmtNum(e.total) + '点';
+      + ' 合計' + fmtNum(e.total) + '点'
+      + ' [感想]' + noteText(e.note);
+  }
+  /* 備考（感想）を1行のテキストに整える。空なら「—」 */
+  function noteText(v) {
+    const t = String(v == null ? '' : v).replace(/\s+/g, ' ').trim();
+    return t || '—';
   }
   /* クリップボードへコピー（だめなら textarea + execCommand で代替） */
   async function copyString(s) {

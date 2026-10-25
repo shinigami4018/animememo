@@ -103,6 +103,13 @@ input[type="date"]{-webkit-appearance:none;appearance:none;min-width:0;}
 .totalwrap{display:flex;gap:6px;align-items:stretch;min-width:0;}
 .totalwrap .inp{flex:1 1 auto;min-width:0;}
 .totalwrap .calcbtn{min-width:0;}
+.titlewrap{display:flex;gap:6px;align-items:stretch;min-width:0;}
+label.f .titlewrap{display:flex;margin-bottom:0;font-size:inherit;color:inherit;}
+.titlewrap .inp{flex:1 1 auto;min-width:0;}
+.recallbtn{flex:0 0 auto;white-space:nowrap;border:1px solid var(--line);background:var(--bg);color:var(--dim);opacity:.55;border-radius:9px;padding:10px;font-size:12px;font-weight:700;cursor:pointer;transition:opacity .15s ease,color .15s ease,border-color .15s ease,background .15s ease;}
+.recallbtn.on{opacity:1;border:1px dashed var(--accent-dim);background:rgba(95,216,196,.09);color:var(--accent);}
+.recallbtn.on:active{border-style:solid;}
+.dupnote{display:block;margin-top:5px;font-size:11.5px;line-height:1.5;color:var(--warn);font-style:normal;font-weight:700;}
 .calcbtn{
   flex:1 1 auto;white-space:nowrap;border:1px dashed var(--accent-dim);
   background:rgba(95,216,196,.09);color:var(--accent);border-radius:9px;
@@ -166,7 +173,11 @@ input[type="date"]{-webkit-appearance:none;appearance:none;min-width:0;}
   <h2 id="formtitle">作品を追加</h2>
   <p class="hint" id="formhint">4項目には当てはまらない評価点、言葉にできない点数を追加点として入力することができます。</p>
   <label class="f"><span>作品名 <em style="color:var(--warn);font-style:normal">*</em></span>
-    <input id="f_title" class="inp" type="text" placeholder="例：〇〇の物語" autocomplete="off"></label>
+    <span class="titlewrap">
+      <input id="f_title" class="inp" type="text" placeholder="例：〇〇の物語" autocomplete="off">
+      <button id="recallbtn" class="recallbtn" type="button" aria-disabled="true">記録呼び出し</button>
+    </span>
+    <em class="dupnote hide" id="dupnote">*同じ作品の記録が存在します</em></label>
   <div class="three">
     <label class="f"><span>キャラ</span><input id="f_char" class="inp" type="text" inputmode="decimal"></label>
     <label class="f"><span>シナリオ</span><input id="f_scenario" class="inp" type="text" inputmode="decimal"></label>
@@ -316,6 +327,8 @@ const USE_ANONYMOUS_AUTH = true;
   const cloudSheet = $('#cloudsheet');
   const passSheet = $('#passsheet');
   const dialogSheet = $('#dialogsheet');
+  const dupNote = $('#dupnote');
+  const recallBtn = $('#recallbtn');
   const toastEl = $('#toast');
 
   const items = new Map();
@@ -962,6 +975,7 @@ const USE_ANONYMOUS_AUTH = true;
     $('#f_watch').value = e ? (parseNum(e.watchCount) || 1) : 1;
     $('#f_note').value = e ? e.note : '';
     $('#f_link').value = e ? e.link : '';
+    syncDup();
     syncCalcBtn();
     openSheet(formSheet);
     setTimeout(() => { try { $('#f_title').focus(); } catch (err) {} }, 240);
@@ -1014,6 +1028,47 @@ const USE_ANONYMOUS_AUTH = true;
     target.watchCount = (w === null || w < 1) ? 1 : Math.floor(w);
     return target;
   }
+  /* ---------------- 作品名の重複チェック ---------------- */
+  /* 保存時と同じ正規化（前後の空白を除いて小文字化）で比較する */
+  function titleKey(v) {
+    return String(v == null ? '' : v).trim().toLowerCase();
+  }
+  /* 同じ作品名の記録を新しい順で返す（編集中の記録そのものは除く） */
+  function findSameTitle(title, excludeId) {
+    const key = titleKey(title);
+    if (!key) return [];
+    return all()
+      .filter((x) => x.id !== excludeId && titleKey(x.title) === key)
+      .sort((a, b) => (Number(b.order) || 0) - (Number(a.order) || 0));
+  }
+  /* 入力に合わせて注意書きと「記録呼び出し」ボタンの状態を切り替える */
+  function syncDup() {
+    const dup = findSameTitle($('#f_title').value, editingId);
+    const has = dup.length > 0;
+    if (dupNote) dupNote.classList.toggle('hide', !has);
+    if (recallBtn) {
+      recallBtn.classList.toggle('on', has);
+      recallBtn.setAttribute('aria-disabled', has ? 'false' : 'true');
+      recallBtn.dataset.dupId = has ? dup[0].id : '';
+    }
+    return has;
+  }
+  /* 同じ作品名の記録内容をフォームへ呼び出す（編集状態にはしない） */
+  function recallSameTitle() {
+    const id = $('#recallbtn').dataset.dupId;
+    const e = id ? items.get(id) : null;
+    if (!e) return;
+    $('#f_title').value = e.title;
+    FIELDS.forEach((f) => { $('#f_' + f.key).value = e[f.key] == null ? '' : e[f.key]; });
+    $('#f_total').value = e.total === null || e.total === undefined ? '' : String(e.total);
+    $('#f_createdAt').value = e.createdAt || '';
+    $('#f_watch').value = String(parseNum(e.watchCount) || 1);
+    $('#f_note').value = e.note || '';
+    $('#f_link').value = e.link || '';
+    syncCalcBtn();
+    syncDup();
+    toast('「' + e.title + '」の記録を呼び出しました');
+  }
   async function save() {
     const src = collect();
     if (!src.title) { toast('作品名を入力してください'); return; }
@@ -1027,8 +1082,7 @@ const USE_ANONYMOUS_AUTH = true;
       toast('更新しました');
       return;
     }
-    const key = src.title.toLowerCase();
-    const dup = all().filter((x) => String(x.title || '').trim().toLowerCase() === key);
+    const dup = findSameTitle(src.title, editingId);
     if (dup.length) {
       const target = dup.slice().sort((a, b) => (Number(b.order) || 0) - (Number(a.order) || 0))[0];
       const pick = await askChoice({
@@ -1163,6 +1217,8 @@ const USE_ANONYMOUS_AUTH = true;
     $('#f_' + f.key).addEventListener('input', clearTotal);
   });
   $('#f_total').addEventListener('input', syncCalcBtn);
+  $('#f_title').addEventListener('input', syncDup);
+  $('#recallbtn').addEventListener('click', () => { if (syncDup()) recallSameTitle(); });
   $('#m_cloud').addEventListener('click', openCloudSheet);
   $('#c_cancel').addEventListener('click', closeAllSheets);
   $('#c_save').addEventListener('click', saveCloudFromSheet);

@@ -351,6 +351,8 @@ const USE_ANONYMOUS_AUTH = true;
 
   const items = new Map();
   let editingId = null;
+  /* 「重複リスト」から呼び出した記録のID（その記録自身を重複扱いしないため） */
+  let recalledId = null;
   let sortKey = 'total';
   let sortAsc = false;
   let query = '';
@@ -919,6 +921,7 @@ const USE_ANONYMOUS_AUTH = true;
     });
     scrim.classList.remove('show');
     editingId = null;
+    recalledId = null;
   }
   let dialogResolve = null;
   function askChoice(opts) {
@@ -979,6 +982,7 @@ const USE_ANONYMOUS_AUTH = true;
   /* ---------------- フォーム ---------------- */
   function openForm(id) {
     editingId = id || null;
+    recalledId = null;
     const e = id ? items.get(id) : null;
     $('#formtitle').textContent = e ? '記録を編集' : '作品を追加';
     $('#formhint').textContent = e
@@ -1088,7 +1092,14 @@ const USE_ANONYMOUS_AUTH = true;
   /* 入力に合わせて注意書きと「重複リスト」ボタンの状態を切り替える */
   function syncDup() {
     const raw = $('#f_title').value.trim();
-    const list = findMatched($('#f_title').value, editingId);
+    /* 呼び出した記録の作品名から書き換えられたら、呼び出し状態を解除する
+       （別の記録と同じ名前になったときは、これまでどおり警告を出す） */
+    if (recalledId) {
+      const r = items.get(recalledId);
+      if (!r || normalizeTitle(r.title) !== normalizeTitle(raw)) recalledId = null;
+    }
+    /* 編集中の記録・呼び出した記録そのものは重複として数えない */
+    const list = findMatched($('#f_title').value, editingId || recalledId);
     const has = list.length > 0;
     if (dupNote) {
       dupNote.textContent = has ? '*' + raw + 'を含む記録が' + list.length + '件あります' : '';
@@ -1103,7 +1114,7 @@ const USE_ANONYMOUS_AUTH = true;
   /* 重複している記録を一覧で出し、選んだものを呼び出せるようにする */
   function openDupList() {
     const raw = $('#f_title').value.trim();
-    const list = findMatched($('#f_title').value, editingId);
+    const list = findMatched($('#f_title').value, editingId || recalledId);
     if (!list.length) { toast('重複する記録がありません'); return; }
     $('#duphint').textContent = '「' + raw + '」を含む記録が' + list.length + '件あります。呼び出す記録を選んでください。';
     $('#duplist').innerHTML = list.map((e) => {
@@ -1118,6 +1129,8 @@ const USE_ANONYMOUS_AUTH = true;
   function recallEntry(id) {
     const e = id ? items.get(id) : null;
     if (!e) return;
+    /* 先に「どの記録を呼び出したか」を確定させ、その記録を重複から外す */
+    recalledId = id;
     $('#f_title').value = e.title;
     FIELDS.forEach((f) => { $('#f_' + f.key).value = e[f.key] == null ? '' : e[f.key]; });
     $('#f_total').value = e.total === null || e.total === undefined ? '' : String(e.total);

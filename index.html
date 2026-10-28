@@ -110,6 +110,12 @@ label.f .titlewrap{display:flex;margin-bottom:0;font-size:inherit;color:inherit;
 .recallbtn.on{opacity:1;border:1px dashed var(--accent-dim);background:rgba(95,216,196,.09);color:var(--accent);}
 .recallbtn.on:active{border-style:solid;}
 .dupnote{display:block;margin-top:5px;font-size:11.5px;line-height:1.5;color:var(--warn);font-style:normal;font-weight:700;}
+.sheet.sheet-top{z-index:60;}
+.duplist{display:flex;flex-direction:column;gap:7px;max-height:46vh;max-height:46dvh;overflow-y:auto;}
+.dupitem{display:flex;gap:9px;align-items:baseline;width:100%;min-width:0;text-align:left;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:11px 12px;font-family:inherit;font-size:13.5px;font-weight:700;color:inherit;cursor:pointer;}
+.dupitem:active{border-color:var(--accent-dim);}
+.dupitem .dtitle{flex:1 1 auto;min-width:0;word-break:break-word;line-height:1.45;}
+.dupitem .dmeta{flex:0 0 auto;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;color:var(--dim);white-space:nowrap;}
 .calcbtn{
   flex:1 1 auto;white-space:nowrap;border:1px dashed var(--accent-dim);
   background:rgba(95,216,196,.09);color:var(--accent);border-radius:9px;
@@ -175,9 +181,9 @@ label.f .titlewrap{display:flex;margin-bottom:0;font-size:inherit;color:inherit;
   <label class="f"><span>作品名 <em style="color:var(--warn);font-style:normal">*</em></span>
     <span class="titlewrap">
       <input id="f_title" class="inp" type="text" placeholder="例：〇〇の物語" autocomplete="off">
-      <button id="recallbtn" class="recallbtn" type="button" aria-disabled="true">記録呼び出し</button>
+      <button id="recallbtn" class="recallbtn" type="button" aria-disabled="true">重複リスト</button>
     </span>
-    <em class="dupnote hide" id="dupnote">*同じ作品の記録が存在します</em></label>
+    <em class="dupnote hide" id="dupnote"></em></label>
   <div class="three">
     <label class="f"><span>キャラ</span><input id="f_char" class="inp" type="text" inputmode="decimal"></label>
     <label class="f"><span>シナリオ</span><input id="f_scenario" class="inp" type="text" inputmode="decimal"></label>
@@ -263,6 +269,17 @@ label.f .titlewrap{display:flex;margin-bottom:0;font-size:inherit;color:inherit;
   <div class="actrow" id="dialogbtns"></div>
 </section>
 
+<!-- 重複リストのシート -->
+<section class="sheet sheet-top" id="dupsheet" aria-hidden="true">
+  <div class="grab"></div>
+  <h2>重複リスト</h2>
+  <p class="hint" id="duphint"></p>
+  <div class="duplist" id="duplist"></div>
+  <div class="actrow">
+    <button class="btn ghost" id="dupclose" type="button">閉じる</button>
+  </div>
+</section>
+
 <input type="file" id="fileinput" accept=".json,application/json" style="display:none">
 <div class="toast" id="toast"></div>
 
@@ -329,6 +346,7 @@ const USE_ANONYMOUS_AUTH = true;
   const dialogSheet = $('#dialogsheet');
   const dupNote = $('#dupnote');
   const recallBtn = $('#recallbtn');
+  const dupSheet = $('#dupsheet');
   const toastEl = $('#toast');
 
   const items = new Map();
@@ -782,9 +800,9 @@ const USE_ANONYMOUS_AUTH = true;
   }
   function all() { return Array.from(items.values()); }
   function visibleEntries() {
-    const q = query.trim().toLowerCase();
+    const q = normalizeTitle(query);
     let arr = all();
-    if (q) arr = arr.filter((e) => String(e.title || '').toLowerCase().includes(q));
+    if (q) arr = arr.filter((e) => normalizeTitle(e.title).indexOf(q) >= 0);
     const dir = sortAsc ? 1 : -1;
     arr.sort((a, b) => {
       let av, bv;
@@ -881,7 +899,7 @@ const USE_ANONYMOUS_AUTH = true;
   }
 
   /* ---------------- シート ---------------- */
-  const SHEETS = () => [formSheet, menuSheet, cloudSheet, passSheet, dialogSheet];
+  const SHEETS = () => [formSheet, menuSheet, cloudSheet, passSheet, dialogSheet, dupSheet];
   function anyOpen() { return SHEETS().some((s) => s.classList.contains('show')); }
   function openSheet(el) {
     el.classList.add('show');
@@ -1028,34 +1046,76 @@ const USE_ANONYMOUS_AUTH = true;
     target.watchCount = (w === null || w < 1) ? 1 : Math.floor(w);
     return target;
   }
-  /* ---------------- 作品名の重複チェック ---------------- */
-  /* 保存時と同じ正規化（前後の空白を除いて小文字化）で比較する */
-  function titleKey(v) {
-    return String(v == null ? '' : v).trim().toLowerCase();
+  /* ---------------- 作品名の照合（表記ゆれ対応） ---------------- */
+  /* 全角/半角・大文字/小文字・カタカナ/ひらがな・記号や空白の違いを吸収し、
+     「サイレント・ウィッチ」→「さいれんとういっち」の形に揃える。 */
+  function normalizeTitle(v) {
+    let s = String(v == null ? '' : v);
+    try { s = s.normalize('NFKC'); } catch (err) { /* 未対応環境ではそのまま */ }
+    s = s.toLowerCase();
+    /* カタカナ → ひらがな（ヴ→ゔ も含む） */
+    s = s.replace(/[\u30a1-\u30f6]/g, (m) => String.fromCharCode(m.charCodeAt(0) - 0x60));
+    /* 小書き文字を普通の大きさに揃える（ぃ→い、ゃ→や） */
+    s = s.replace(/[ぁぃぅぇぉ]/g, (m) => 'あいうえお'.charAt('ぁぃぅぇぉ'.indexOf(m)));
+    s = s.replace(/[ゃゅょ]/g, (m) => 'やゆよ'.charAt('ゃゅょ'.indexOf(m)));
+    s = s.replace(/ゎ/g, 'わ');
+    /* 長音符の有無は問わない（メモリー / メモリ を同じ扱いにする） */
+    s = s.replace(/ー/g, '');
+    /* 空白・記号・約物を落として文字と数字だけ残す */
+    try {
+      s = s.replace(/[^\p{L}\p{N}]/gu, '');
+    } catch (err) {
+      s = s.replace(/[^\w\u3040-\u30ff\u4e00-\u9fff\uff66-\uff9f]/g, '');
+    }
+    return s;
   }
-  /* 同じ作品名の記録を新しい順で返す（編集中の記録そのものは除く） */
-  function findSameTitle(title, excludeId) {
-    const key = titleKey(title);
+  /* 入力した文字を「含む」記録を新しい順で返す（部分一致・編集中の記録は除く） */
+  function findMatched(title, excludeId) {
+    const key = normalizeTitle(title);
     if (!key) return [];
     return all()
-      .filter((x) => x.id !== excludeId && titleKey(x.title) === key)
+      .filter((x) => x.id !== excludeId && normalizeTitle(x.title).indexOf(key) >= 0)
       .sort((a, b) => (Number(b.order) || 0) - (Number(a.order) || 0));
   }
-  /* 入力に合わせて注意書きと「記録呼び出し」ボタンの状態を切り替える */
+  /* 完全に同じ作品名の記録（保存時の上書き確認に使う） */
+  function findSameTitle(title, excludeId) {
+    const key = normalizeTitle(title);
+    if (!key) return [];
+    return all()
+      .filter((x) => x.id !== excludeId && normalizeTitle(x.title) === key)
+      .sort((a, b) => (Number(b.order) || 0) - (Number(a.order) || 0));
+  }
+  /* 入力に合わせて注意書きと「重複リスト」ボタンの状態を切り替える */
   function syncDup() {
-    const dup = findSameTitle($('#f_title').value, editingId);
-    const has = dup.length > 0;
-    if (dupNote) dupNote.classList.toggle('hide', !has);
+    const raw = $('#f_title').value.trim();
+    const list = findMatched($('#f_title').value, editingId);
+    const has = list.length > 0;
+    if (dupNote) {
+      dupNote.textContent = has ? '*' + raw + 'を含む記録が' + list.length + '件あります' : '';
+      dupNote.classList.toggle('hide', !has);
+    }
     if (recallBtn) {
       recallBtn.classList.toggle('on', has);
       recallBtn.setAttribute('aria-disabled', has ? 'false' : 'true');
-      recallBtn.dataset.dupId = has ? dup[0].id : '';
     }
     return has;
   }
-  /* 同じ作品名の記録内容をフォームへ呼び出す（編集状態にはしない） */
-  function recallSameTitle() {
-    const id = $('#recallbtn').dataset.dupId;
+  /* 重複している記録を一覧で出し、選んだものを呼び出せるようにする */
+  function openDupList() {
+    const raw = $('#f_title').value.trim();
+    const list = findMatched($('#f_title').value, editingId);
+    if (!list.length) { toast('重複する記録がありません'); return; }
+    $('#duphint').textContent = '「' + raw + '」を含む記録が' + list.length + '件あります。呼び出す記録を選んでください。';
+    $('#duplist').innerHTML = list.map((e) => {
+      const meta = fmtNum(e.total) + '点 · ' + (e.createdAt ? fmtDate(e.createdAt) : '日付なし');
+      return '<button class="dupitem" type="button" data-recall="' + esc(e.id) + '">'
+        + '<span class="dtitle">' + esc(e.title) + '</span>'
+        + '<span class="dmeta">' + esc(meta) + '</span></button>';
+    }).join('');
+    openSheet(dupSheet);
+  }
+  /* 選んだ記録の内容をフォームへ呼び出す（編集状態にはしない） */
+  function recallEntry(id) {
     const e = id ? items.get(id) : null;
     if (!e) return;
     $('#f_title').value = e.title;
@@ -1067,6 +1127,7 @@ const USE_ANONYMOUS_AUTH = true;
     $('#f_link').value = e.link || '';
     syncCalcBtn();
     syncDup();
+    closeSheet(dupSheet);
     toast('「' + e.title + '」の記録を呼び出しました');
   }
   async function save() {
@@ -1218,7 +1279,12 @@ const USE_ANONYMOUS_AUTH = true;
   });
   $('#f_total').addEventListener('input', syncCalcBtn);
   $('#f_title').addEventListener('input', syncDup);
-  $('#recallbtn').addEventListener('click', () => { if (syncDup()) recallSameTitle(); });
+  $('#recallbtn').addEventListener('click', openDupList);
+  $('#dupclose').addEventListener('click', () => closeSheet(dupSheet));
+  $('#duplist').addEventListener('click', (ev) => {
+    const b = ev.target.closest('[data-recall]');
+    if (b) recallEntry(b.dataset.recall);
+  });
   $('#m_cloud').addEventListener('click', openCloudSheet);
   $('#c_cancel').addEventListener('click', closeAllSheets);
   $('#c_save').addEventListener('click', saveCloudFromSheet);
